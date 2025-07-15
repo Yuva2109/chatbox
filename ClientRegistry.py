@@ -2,8 +2,8 @@ import socket
 import threading
 
 class ClientRegistry:
-    _client_map = {}  #clients dictionary
-    _lock = threading.Lock() # avoid overlaps of different clients msg
+    _client_map = {}
+    _lock = threading.Lock()
 
     @classmethod
     def add_client(cls, username: str, client_socket: socket.socket) -> bool:
@@ -27,6 +27,11 @@ class ClientRegistry:
     def username_exists(cls, username: str) -> bool:
         with cls._lock:
             return username in cls._client_map
+
+    @classmethod
+    def get_all_usernames(cls):
+        with cls._lock:
+            return list(cls._client_map.keys())
 
     @classmethod
     def print_clients(cls):

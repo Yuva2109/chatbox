@@ -1,7 +1,7 @@
 import socket
 import threading
 
-SERVER_HOST = '127.0.0.1'  
+SERVER_HOST = '127.0.0.1'
 SERVER_PORT = 12345
 
 def receive_messages(sock):
@@ -21,17 +21,27 @@ def main():
         client.connect((SERVER_HOST, SERVER_PORT))
         print(f"Connected to server at {SERVER_HOST}:{SERVER_PORT}")
 
-        threading.Thread(target=receive_messages, args=(client,), daemon=True).start()
+        # Receive username prompt
+        server_msg = client.recv(1024).decode()
+        print(server_msg, end='')
+        username = input()
+        client.sendall(username.encode())
 
+        # Receive server response to username
         while True:
-            server_msg = client.recv(1024).decode()
-            print(server_msg, end='') 
-            username = input()
-            client.sendall(username.encode())
             response = client.recv(1024).decode()
-            print(response, end='')  
+            print(response, end='')
             if "Welcome" in response:
                 break
+            username = input()
+            client.sendall(username.encode())
+
+        # Print additional instructions
+        print("You can now send private messages using the format: @username message")
+        print("Type 'exit' to leave the chat.")
+
+        # Start background listener
+        threading.Thread(target=receive_messages, args=(client,), daemon=True).start()
 
         while True:
             msg = input()

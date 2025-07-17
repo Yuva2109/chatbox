@@ -1,23 +1,72 @@
 import socket
 import threading
+import mysql.connector
+import bcrypt
 
 from ClientRegistry import ClientRegistry
 
-HOST = '127.0.0.1'
+HOST = '0.0.0.0'
 PORT = 12345
+
+# 🔗 1️⃣ Setup DB connection once at start
+db = mysql.connector.connect(
+    host="localhost",
+    user="root",
+    password="Root12",
+    database="chatbox_db"
+)
+cursor = db.cursor(buffered=True)  # buffered lets you reuse cursor safely
 
 def handle_client(client_socket, addr):
     try:
-        client_socket.sendall(b'Enter username: ')
-        while True:
-            username = client_socket.recv(1024).decode().strip()
-            if ClientRegistry.add_client(username, client_socket):
-                client_socket.sendall(f"Welcome, {username}!\n".encode())
-                break
-            else:
-                client_socket.sendall(b"Username already taken. Try again: ")
+        # 2️⃣ Ask: signup or login
+        client_socket.sendall(b"Do you want to [signup] or [login]? ")
+        action = client_socket.recv(1024).decode().strip().lower()
 
-        # Send list of currently online users
+        if action == "signup":
+            client_socket.sendall(b"Choose a username: ")
+            username = client_socket.recv(1024).decode().strip()
+
+            client_socket.sendall(b"Choose a password: ")
+            password = client_socket.recv(1024).decode().strip()
+
+            hashed_pw = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+            try:
+                cursor.execute(
+                    "INSERT INTO users (username, password_hash) VALUES (%s, %s)",
+                    (username, hashed_pw)
+                )
+                db.commit()
+                client_socket.sendall(b"Signup successful! Please restart and login.\n")
+                return  # exit to force re-login
+
+            except mysql.connector.IntegrityError:
+                client_socket.sendall(b"Username already exists. Please try again.\n")
+                return
+
+        # 🔒 Login flow
+        client_socket.sendall(b"Username: ")
+        username = client_socket.recv(1024).decode().strip()
+
+        client_socket.sendall(b"Password: ")
+        password = client_socket.recv(1024).decode().strip()
+
+        cursor.execute("SELECT password_hash FROM users WHERE username = %s", (username,))
+        row = cursor.fetchone()
+
+        if row and bcrypt.checkpw(password.encode(), row[0].encode()):
+            client_socket.sendall(f"Welcome, {username}!\n".encode())
+        else:
+            client_socket.sendall(b"Invalid username or password.\n")
+            return
+
+        # ✅ Register active user
+        if not ClientRegistry.add_client(username, client_socket):
+            client_socket.sendall(b"User is already logged in elsewhere.\n")
+            return
+
+        # Send list of other users
         other_users = [u for u in ClientRegistry.get_all_usernames() if u != username]
         if other_users:
             client_socket.sendall(f"Currently online: {', '.join(other_users)}\n".encode())
@@ -25,9 +74,7 @@ def handle_client(client_socket, addr):
             client_socket.sendall(b"No one else is online.\n")
 
         client_socket.sendall(b"Use @username message to send private messages.\n")
-
         broadcast_message(f"[INFO] {username} has joined the chat.\n", exclude_username=username)
-
         ClientRegistry.print_clients()
 
         while True:
@@ -58,12 +105,13 @@ def handle_client(client_socket, addr):
 
     except Exception as e:
         print(f"[ERROR] Client error: {e}")
+
     finally:
         ClientRegistry.remove_client(username)
         broadcast_message(f"[INFO] {username} has left the chat.\n", exclude_username=username)
         client_socket.close()
         print(f"[INFO] {username} disconnected.")
-        
+
 def broadcast_message(message: str, exclude_username: str = ""):
     for user in ClientRegistry.get_all_usernames():
         if user != exclude_username:
@@ -72,13 +120,13 @@ def broadcast_message(message: str, exclude_username: str = ""):
                 try:
                     sock.sendall(message.encode())
                 except:
-                    pass  # Ignore failures (e.g., disconnected clients)
+                    pass
 
 def start_server():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((HOST, PORT))
     server.listen()
-    print(f"Server started on port {PORT}")
+    print(f"Server started on {HOST}:{PORT}")
 
     while True:
         client_socket, addr = server.accept()

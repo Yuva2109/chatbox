@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chatbox Login</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="chat-container">
+    <h2>💬 Chatbox</h2>
+    <div class="form-group">
+      <input type="text" id="username-input" placeholder="Username" />
+
+      <div class="password-wrapper">
+        <input type="password" id="password-input" placeholder="Password" />
+        <button type="button" id="toggle-password">👁️</button>
+      </div>
+
+      <button id="auth-btn">Login</button>
+      <p id="switch-auth-text">Don’t have an account? <span id="switch-link">Sign up</span></p>
+      <p id="error-msg" class="error-text"></p>
+    </div>
+  </div>
+  <script src="login.js"></script>
+</body>
+</html>

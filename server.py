@@ -12,7 +12,7 @@ PORT = 12345
 db = mysql.connector.connect(
     host="localhost",
     user="root",
-    password="Root12",
+    password="yuva2109",
     database="chatbox_db"
 )
 cursor = db.cursor(buffered=True)  # buffered lets you reuse cursor safely

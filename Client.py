@@ -1,7 +1,7 @@
 import socket
 import threading
 
-SERVER_HOST = '10.126.181.137'
+SERVER_HOST = '10.126.181.97'
 SERVER_PORT = 12345
 
 def receive_messages(sock):

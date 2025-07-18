@@ -4,7 +4,7 @@ import mysql.connector
 import bcrypt
 from ClientRegistry import ClientRegistry
 
-HOST = '0.0.0.0'
+HOST = '172.20.10.2'
 PORT = 12345
 
 db = mysql.connector.connect(
@@ -64,6 +64,17 @@ def handle_client(client_socket, addr):
             client_socket.sendall(b"User already logged in elsewhere.\n")
             return
 
+        # Deliver any offline messages
+        cursor.execute(
+            "SELECT id, from_user, message FROM messages WHERE to_user = %s AND delivered = FALSE",
+            (username,)
+        )
+        pending = cursor.fetchall()
+        for msg_id, from_user, message_content in pending:
+            client_socket.sendall(f"[Offline Message from {from_user}]: {message_content}\n".encode())
+            cursor.execute("UPDATE messages SET delivered = TRUE WHERE id = %s", (msg_id,))
+            db.commit()
+
         other_users = [u for u in ClientRegistry.get_all_usernames() if u != username]
         if other_users:
             client_socket.sendall(f"Currently online: {', '.join(other_users)}\n".encode())
@@ -95,7 +106,14 @@ def handle_client(client_socket, addr):
                     recipient_socket.sendall(f"[From {username}]: {message_content}\n".encode())
                     client_socket.sendall(f"[To {recipient_name}]: {message_content}\n".encode())
                 else:
-                    client_socket.sendall(f"User '{recipient_name}' not found.\n".encode())
+                    cursor.execute(
+                        "INSERT INTO messages (from_user, to_user, message) VALUES (%s, %s, %s)",
+                        (username, recipient_name, message_content)
+                    )
+                    db.commit()
+                    client_socket.sendall(
+                        f"User '{recipient_name}' is offline. Message saved and will be delivered later.\n".encode()
+                    )
             else:
                 client_socket.sendall(b"Invalid message format. Use @username message\n")
     except Exception as e:

@@ -2,71 +2,87 @@ import socket
 import threading
 import mysql.connector
 import bcrypt
-
+import time
 from ClientRegistry import ClientRegistry
 
 HOST = '0.0.0.0'
 PORT = 12345
 
-# 🔗 1️⃣ Setup DB connection once at start
+
 db = mysql.connector.connect(
     host="localhost",
     user="root",
-    password="yuva2109",
+    password="pkbqyiytuh9#738",
     database="chatbox_db"
 )
-cursor = db.cursor(buffered=True)  # buffered lets you reuse cursor safely
+cursor = db.cursor(buffered=True)  
 
 def handle_client(client_socket, addr):
+    username = None 
+    early_exit = False 
+
     try:
-        # 2️⃣ Ask: signup or login
-        client_socket.sendall(b"Do you want to [signup] or [login]? ")
-        action = client_socket.recv(1024).decode().strip().lower()
+        while True:
+            client_socket.sendall(b"Do you want to [signup] or [login]? ")
+            action = client_socket.recv(1024).decode().strip().lower()
 
-        if action == "signup":
-            client_socket.sendall(b"Choose a username: ")
-            username = client_socket.recv(1024).decode().strip()
+            if action == "signup":
+                client_socket.sendall(b"Choose a username: ")
+                username = client_socket.recv(1024).decode().strip()
 
-            client_socket.sendall(b"Choose a password: ")
-            password = client_socket.recv(1024).decode().strip()
+                client_socket.sendall(b"Choose a password: ")
+                password = client_socket.recv(1024).decode().strip()
 
-            hashed_pw = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+                hashed_pw = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
-            try:
-                cursor.execute(
-                    "INSERT INTO users (username, password_hash) VALUES (%s, %s)",
-                    (username, hashed_pw)
-                )
-                db.commit()
-                client_socket.sendall(b"Signup successful! Please restart and login.\n")
-                return  # exit to force re-login
+                try:
+                    cursor.execute(
+                        "INSERT INTO users (username, password_hash) VALUES (%s, %s)",
+                        (username, hashed_pw)
+                    )
+                    db.commit()
+                    client_socket.sendall(b"Signup successful! Please restart and login.\n")
 
-            except mysql.connector.IntegrityError:
-                client_socket.sendall(b"Username already exists. Please try again.\n")
-                return
+                except mysql.connector.IntegrityError:
+                    client_socket.sendall(b"Username already exists. Please try again.\n")
+                continue
 
-        # 🔒 Login flow
-        client_socket.sendall(b"Username: ")
-        username = client_socket.recv(1024).decode().strip()
+            elif action == "login":
+                while True:
+                    client_socket.sendall(b"Username: ")
+                    username = client_socket.recv(1024).decode().strip()
 
-        client_socket.sendall(b"Password: ")
-        password = client_socket.recv(1024).decode().strip()
+                    client_socket.sendall(b"Password: ")
+                    password = client_socket.recv(1024).decode().strip()
 
-        cursor.execute("SELECT password_hash FROM users WHERE username = %s", (username,))
-        row = cursor.fetchone()
+                    cursor.execute("SELECT password_hash FROM users WHERE username = %s", (username,))
+                    row = cursor.fetchone()
 
-        if row and bcrypt.checkpw(password.encode(), row[0].encode()):
-            client_socket.sendall(f"Welcome, {username}!\n".encode())
-        else:
-            client_socket.sendall(b"Invalid username or password.\n")
-            return
+                    if row and bcrypt.checkpw(password.encode(), row[0].encode()):
+                        client_socket.sendall(f"Welcome, {username}!\n".encode())
+                        break
+                    else:
+                        client_socket.sendall(b"Invalid username or password.\n")
+                break
+            else:
+                client_socket.sendall(b"Invalid option. Please type signup or login.\n")
 
         # ✅ Register active user
         if not ClientRegistry.add_client(username, client_socket):
             client_socket.sendall(b"User is already logged in elsewhere.\n")
+            early_exit=True
             return
-
-        # Send list of other users
+        
+        cursor.execute(
+            "SELECT id, from_user, message FROM messages WHERE to_user = %s AND delivered = FALSE",
+            (username,)
+        )
+        pending = cursor.fetchall()
+        for msg_id, from_user, message_content in pending:
+            client_socket.sendall(f"[Offline Message from {from_user}]: {message_content}\n".encode())
+            cursor.execute("UPDATE messages SET delivered = TRUE WHERE id = %s", (msg_id,))
+            db.commit()
+        time.sleep(0.5)
         other_users = [u for u in ClientRegistry.get_all_usernames() if u != username]
         if other_users:
             client_socket.sendall(f"Currently online: {', '.join(other_users)}\n".encode())
@@ -99,7 +115,14 @@ def handle_client(client_socket, addr):
                     recipient_socket.sendall(f"[From {username}]: {message_content}\n".encode())
                     client_socket.sendall(f"[To {recipient_name}]: {message_content}\n".encode())
                 else:
-                    client_socket.sendall(f"User '{recipient_name}' not found.\n".encode())
+                    cursor.execute(
+                        "INSERT INTO messages (from_user, to_user, message) VALUES (%s, %s, %s)",
+                        (username, recipient_name, message_content)
+                    )
+                    db.commit()
+                    client_socket.sendall(
+                        f"User '{recipient_name}' is offline. Message saved and will be delivered later.\n".encode()
+                    )
             else:
                 client_socket.sendall(b"Invalid message format. Use @username message\n")
 
@@ -107,10 +130,12 @@ def handle_client(client_socket, addr):
         print(f"[ERROR] Client error: {e}")
 
     finally:
-        ClientRegistry.remove_client(username)
-        broadcast_message(f"[INFO] {username} has left the chat.\n", exclude_username=username)
+        if not early_exit and username:
+            ClientRegistry.remove_client(username)
+            broadcast_message(f"[INFO] {username} has left the chat.\n", exclude_username=username)
         client_socket.close()
         print(f"[INFO] {username} disconnected.")
+
 
 def broadcast_message(message: str, exclude_username: str = ""):
     for user in ClientRegistry.get_all_usernames():

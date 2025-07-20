@@ -11,7 +11,7 @@ document.getElementById("username-label").textContent = username;
 const wsChat = new WebSocket("ws://localhost:8081");
 
 wsChat.onopen = () => {
-  // wait for server to prompt
+  
 };
 
 wsChat.onmessage = (event) => {
@@ -24,10 +24,13 @@ wsChat.onmessage = (event) => {
     wsChat.send(username);
   } else if (msg.includes("password:")) {
     wsChat.send(password);
-  } else if (msg.includes("welcome")) {
+  }  else if (msg.includes("welcome")) {
+    loggedIn = true;
     displayMessage(event.data);
-  } else {
-    displayMessage(event.data);
+    console.log("[Login Success] Waiting for any offline messages...");
+  } else if (loggedIn) {
+    console.log("📩 Offline/Other message:", event.data);  
+    displayMessage(event.data);  
   }
 };
 

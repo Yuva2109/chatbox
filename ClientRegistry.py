@@ -8,10 +8,18 @@ class ClientRegistry:
     @classmethod
     def add_client(cls, username: str, client_socket: socket.socket) -> bool:
         with cls._lock:
-            if username not in cls._client_map:
-                cls._client_map[username] = client_socket
-                return True
-            return False
+            old_socket = cls._client_map.get(username)
+            if old_socket:
+                try:
+                    old_socket.send(b'ping')
+                except:
+                    # Old socket is dead, allow new login
+                    cls._client_map[username] = client_socket
+                    return True
+                return False
+            cls._client_map[username] = client_socket
+            return True
+
 
     @classmethod
     def remove_client(cls, username: str):

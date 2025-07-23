@@ -1,19 +1,20 @@
 import socket
 import threading
 
-SERVER_HOST = '172.20.10.2'
+SERVER_HOST = '10.137.245.137'
 SERVER_PORT = 12345
 
 def receive_messages(sock):
-    while True:
-        try:
-            msg = sock.recv(1024).decode()
-            if not msg:
+    try:
+        while True:
+            data = sock.recv(1024)
+            if not data:
                 break
-            print(msg)
-        except Exception as e:
-            print(f"[ERROR] Connection lost: {e}")
-            break
+            print(data.decode())
+    except:
+        pass
+    finally:
+        sock.close()
 
 def main():
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -21,23 +22,44 @@ def main():
         client.connect((SERVER_HOST, SERVER_PORT))
         print(f"Connected to server at {SERVER_HOST}:{SERVER_PORT}")
 
-        # Receive username prompt
+        # Example: receive prompt to signup/login
+        while True:
+            server_msg = client.recv(1024).decode()
+            print(server_msg, end='')
+            choice = input()
+            client.sendall(choice.encode())
+            if choice.lower() == 'login':
+                break  # Assuming you skip signup for now
+
+        # Example: receive username prompt
         server_msg = client.recv(1024).decode()
         print(server_msg, end='')
         username = input()
         client.sendall(username.encode())
 
-        # Receive server response to username
+        # Receive password prompt
+        server_msg = client.recv(1024).decode()
+        print(server_msg, end='')
+        password = input()
+        client.sendall(password.encode())
+
+        # Wait for server welcome or retry loop
         while True:
             response = client.recv(1024).decode()
             print(response, end='')
             if "Welcome" in response:
                 break
+            # Prompt again if wrong
+            server_msg = client.recv(1024).decode()
+            print(server_msg, end='')
             username = input()
             client.sendall(username.encode())
+            server_msg = client.recv(1024).decode()
+            print(server_msg, end='')
+            password = input()
+            client.sendall(password.encode())
 
-        # Print additional instructions
-        print("You can now send private messages using the format: @username message")
+        print("You can now send private messages using @username message")
         print("Type 'exit' to leave the chat.")
 
         # Start background listener
@@ -46,6 +68,7 @@ def main():
         while True:
             msg = input()
             if msg.lower() == 'exit':
+                client.close()
                 break
             client.sendall(msg.encode())
 

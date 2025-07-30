@@ -5,7 +5,7 @@ import bcrypt
 db = mysql.connector.connect(
     host="localhost",
     user="root",
-    password="pkbqyiytuh9#738",
+    password="Root12",
     database="chatbox_db"
 )
 cursor = db.cursor(dictionary=True)
@@ -15,6 +15,10 @@ def get_user_password_hash(username):
     cursor.execute("SELECT password_hash FROM users WHERE username = %s", (username,))
     result = cursor.fetchone()
     return result['password_hash'] if result else None
+
+def get_all_users():
+    cursor.execute("SELECT username FROM users")
+    return [row['username'] for row in cursor.fetchall()]
 
 
 def store_user(username, password):

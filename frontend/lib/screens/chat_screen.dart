@@ -17,40 +17,47 @@ class _ChatScreenState extends State<ChatScreen> {
   final _apiService = ApiService();
 
   String? _toUser;
-  List<String> _onlineUsers = [];
+  List<Map<String, dynamic>> _combinedUsers = [];
 
   @override
-  @override
-void initState() {
-  super.initState();
+  void initState() {
+    super.initState();
 
-  final authProvider = Provider.of<AuthProvider>(context, listen: false);
-  final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    final password = authProvider.user!.password;
 
-  final password = authProvider.user!.password;
+    _wsService.onOnlineUsersUpdated = (onlineUsers) {
+      _combineUsers(onlineUsers);
+    };
 
-  //Setup real-time online users update
-  _wsService.onOnlineUsersUpdated = (users) {
-    setState(() {
-      _onlineUsers = users;
+    _wsService.connect(authProvider.user!.username, password, (Message msg) {
+      chatProvider.addMessage(msg);
     });
-  };
 
-  // Connect to WebSocket
-  _wsService.connect(authProvider.user!.username, password, (Message msg) {
-    chatProvider.addMessage(msg);
-  });
+    _loadUsers();
+  }
 
-  // Also fetch once from REST API in case WebSocket fails
-  _loadOnlineUsers();
-}
+  void _loadUsers() async {
+    final allUsers = await _apiService.getAllUsers();
+    final onlineUsers = await _apiService.getOnlineUsers();
+    _combineUsers(onlineUsers, allUsers: allUsers);
+  }
 
+  void _combineUsers(List<String> online, {List<String>? allUsers}) async {
+    if (allUsers == null) {
+      allUsers = await _apiService.getAllUsers();
+    }
 
-  void _loadOnlineUsers() async {
-    final users = await _apiService.getOnlineUsers();
-    print(users);   // Debug 
+    final combined = allUsers.map((u) {
+      return {
+        'username': u,
+        'online': online.contains(u),
+      };
+    }).toList();
+
     setState(() {
-      _onlineUsers = users;
+      _combinedUsers = combined;
     });
   }
 
@@ -71,28 +78,39 @@ void initState() {
         actions: [
           IconButton(
             icon: Icon(Icons.refresh),
-            onPressed: _loadOnlineUsers,
+            onPressed: _loadUsers,
             tooltip: 'Refresh Users',
           ),
         ],
       ),
       body: Row(
         children: [
-          // Online users panel (like WhatsApp)
+          // LEFT SIDEBAR — all users with online/offline dot
           Container(
             width: 200,
             color: Colors.grey[200],
             child: ListView.builder(
-              itemCount: _onlineUsers.length,
+              itemCount: _combinedUsers.length,
               itemBuilder: (_, index) {
-                final user = _onlineUsers[index];
-                if (user == authProvider.user!.username) return SizedBox.shrink(); // skip self
+                final user = _combinedUsers[index];
+                final username = user['username'];
+                final isOnline = user['online'];
+
+                if (username == authProvider.user!.username) {
+                  return SizedBox.shrink(); // skip self
+                }
+
                 return ListTile(
-                  title: Text(user),
-                  selected: user == _toUser,
+                  leading: Icon(
+                    Icons.circle,
+                    size: 12,
+                    color: isOnline ? Colors.green : Colors.red,
+                  ),
+                  title: Text(username),
+                  selected: username == _toUser,
                   onTap: () {
                     setState(() {
-                      _toUser = user;
+                      _toUser = username;
                     });
                   },
                 );
@@ -100,7 +118,7 @@ void initState() {
             ),
           ),
 
-          // Chat window
+          // RIGHT CHAT PANEL
           Expanded(
             child: Column(
               children: [

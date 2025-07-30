@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from auth import hash_password, verify_password
-from database import store_user, fetch_offline_messages
+from database import store_user, fetch_offline_messages , get_all_users
 from ClientRegistry import ClientRegistry
 
 app = Flask(__name__)
@@ -51,6 +51,11 @@ def get_offline_messages(username):
         return jsonify({"messages": []}), 200
 
     return jsonify({"messages": messages}), 200
+
+@app.route('/users', methods=['GET'])
+def get_all_users_route():
+    all_users = get_all_users()
+    return jsonify({"users": all_users}), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

@@ -32,6 +32,17 @@ class ApiService {
     }
   }
 
+  Future<List<String>> getAllUsers() async {
+  final res = await http.get(Uri.parse('$baseUrl/users'));
+  if (res.statusCode == 200) {
+    final data = jsonDecode(res.body);
+    return List<String>.from(data['users']);
+  } else {
+    return [];
+  }
+}
+
+
   Future<List<Map<String, dynamic>>> getOfflineMessages(String username) async {
     final res = await http.get(Uri.parse('$baseUrl/messages/$username'));
     if (res.statusCode == 200) {

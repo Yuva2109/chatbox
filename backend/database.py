@@ -5,7 +5,7 @@ import bcrypt
 db = mysql.connector.connect(
     host="localhost",
     user="root",
-    password="Root12",
+    password="pkbqyiytuh9#738",
     database="chatbox_db"
 )
 cursor = db.cursor(dictionary=True)

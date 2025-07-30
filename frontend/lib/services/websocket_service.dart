@@ -9,7 +9,7 @@ class WebSocketService {
 
   void connect(String username, String password, OnMessageReceived onMessage) {
     _channel = WebSocketChannel.connect(
-      Uri.parse('ws://10.137.245.137:12345'),
+      Uri.parse('ws://172.22.155.73:12345'),
     );
 
     _channel!.stream.listen((message) {

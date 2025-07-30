@@ -20,22 +20,35 @@ class _ChatScreenState extends State<ChatScreen> {
   List<String> _onlineUsers = [];
 
   @override
-  void initState() {
-    super.initState();
+  @override
+void initState() {
+  super.initState();
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+  final authProvider = Provider.of<AuthProvider>(context, listen: false);
+  final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
-    final password = authProvider.user!.password ; 
-    _wsService.connect(authProvider.user!.username, password, (Message msg) {
-      chatProvider.addMessage(msg);
+  final password = authProvider.user!.password;
+
+  //Setup real-time online users update
+  _wsService.onOnlineUsersUpdated = (users) {
+    setState(() {
+      _onlineUsers = users;
     });
+  };
 
-    _loadOnlineUsers();
-  }
+  // Connect to WebSocket
+  _wsService.connect(authProvider.user!.username, password, (Message msg) {
+    chatProvider.addMessage(msg);
+  });
+
+  // Also fetch once from REST API in case WebSocket fails
+  _loadOnlineUsers();
+}
+
 
   void _loadOnlineUsers() async {
     final users = await _apiService.getOnlineUsers();
+    print(users);   // Debug 
     setState(() {
       _onlineUsers = users;
     });

@@ -6,9 +6,9 @@ class AuthProvider extends ChangeNotifier {
 
   User? get user => _user;
 
-  void login(String username) {
-    _user = User(username: username);
-    notifyListeners();
+  void login(String username, String password) {
+  _user = User(username: username, password: password);
+  notifyListeners();
   }
 
   void logout() {

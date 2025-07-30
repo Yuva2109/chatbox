@@ -37,7 +37,7 @@ class LoginScreen extends StatelessWidget {
                   _passwordController.text,
                 );
                 if (success) {
-                  authProvider.login(_usernameController.text);
+                  authProvider.login(_usernameController.text, _passwordController.text);
                   Navigator.pushReplacementNamed(context, '/chat');
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(

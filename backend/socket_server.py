@@ -69,10 +69,8 @@ async def handle_client(websocket):
 
         # Send online users
         online_users = [u for u in ClientRegistry.get_all_usernames() if u != username]
-        await send_json(websocket, {
-            "type": "online_users",
-            "users": online_users
-        })
+        await notify_all_users_about_online_list()
+
 
         await send_json(websocket, {
             "type": "system",
@@ -130,6 +128,8 @@ async def handle_client(websocket):
         if username:
             ClientRegistry.remove_client(username)
             connected_users.pop(username, None)
+            await notify_all_users_about_online_list()
+            
             await broadcast_message({
                 "type": "system",
                 "message": f"{username} has left the chat."
@@ -143,6 +143,17 @@ async def broadcast_message(message_dict, exclude=None):
                 await send_json(ws, message_dict)
             except:
                 pass
+
+async def notify_all_users_about_online_list():
+    online_users = ClientRegistry.get_all_usernames()
+    for user, ws in connected_users.items():
+        try:
+            await send_json(ws, {
+                "type": "online_users",
+                "users": [u for u in online_users if u != user]
+            })
+        except:
+            pass
 
 
 async def main():

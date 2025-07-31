@@ -123,16 +123,18 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Column(
               children: [
                 Expanded(
-                  child: ListView.builder(
-                    itemCount: chatProvider.messages.length,
-                    itemBuilder: (_, index) {
-                      final msg = chatProvider.messages[index];
-                      return ListTile(
+                  child: ListView(
+                    children: chatProvider.messages
+                      .where((msg) =>
+                        (msg.from == authProvider.user!.username && msg.to == _toUser) ||
+                        (msg.from == _toUser && msg.to == authProvider.user!.username))
+                      .map((msg) => ListTile(
                         title: Text('${msg.from}: ${msg.message}'),
-                      );
-                    },
-                  ),
+                      ))
+                      .toList(),
+                  )
                 ),
+
                 Row(
                   children: [
                     Expanded(

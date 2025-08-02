@@ -16,7 +16,8 @@ def get_user_password_hash(username):
     result = cursor.fetchone()
     return result['password_hash'] if result else None
 
-def get_all_users():
+
+def get_all_registered_users():
     cursor.execute("SELECT username FROM users")
     return [row['username'] for row in cursor.fetchall()]
 

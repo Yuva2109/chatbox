@@ -4,7 +4,8 @@ import json
 from auth import verify_password
 from database import (
     store_user, fetch_offline_messages,
-    save_message, mark_messages_delivered
+    save_message, mark_messages_delivered,
+    get_all_registered_users
 )
 from ClientRegistry import ClientRegistry
 
@@ -14,6 +15,22 @@ connected_users = {}  # username -> websocket
 
 async def send_json(ws, data):
     await ws.send(json.dumps(data))
+
+
+async def broadcast_online_users():
+    online_users = ClientRegistry.get_all_usernames()
+    all_users = get_all_registered_users()
+
+    message = {
+        "type": "presence_update",
+        "online_users": online_users,
+        "all_users": all_users
+    }
+    for user, ws in connected_users.items():
+        try:
+            await send_json(ws, message)
+        except:
+            pass
 
 
 async def handle_client(websocket):
@@ -67,12 +84,8 @@ async def handle_client(websocket):
             })
         mark_messages_delivered(username)
 
-        # Send online users
-        online_users = [u for u in ClientRegistry.get_all_usernames() if u != username]
-        await send_json(websocket, {
-            "type": "online_users",
-            "users": online_users
-        })
+        # ✅ Broadcast to everyone — includes full user list + who’s online
+        await broadcast_online_users()
 
         await send_json(websocket, {
             "type": "system",
@@ -134,6 +147,7 @@ async def handle_client(websocket):
                 "type": "system",
                 "message": f"{username} has left the chat."
             }, exclude=username)
+            await broadcast_online_users()
 
 
 async def broadcast_message(message_dict, exclude=None):
@@ -149,6 +163,7 @@ async def main():
     async with websockets.serve(handle_client, "0.0.0.0", PORT):
         print(f"[✅] WebSocket server running on ws://0.0.0.0:{PORT}")
         await asyncio.Future()  # run forever
+
 
 if __name__ == "__main__":
     asyncio.run(main())

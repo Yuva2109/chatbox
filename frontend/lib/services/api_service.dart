@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  final String baseUrl = 'http://172.22.155.73:5000';
+  final String baseUrl = 'http://172.22.155.137:5000';
 
   Future<bool> signup(String username, String password) async {
     final res = await http.post(

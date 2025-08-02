@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from auth import hash_password, verify_password
-from database import store_user, fetch_offline_messages , get_all_users
+from database import store_user, fetch_offline_messages , get_all_registered_users
 from ClientRegistry import ClientRegistry
 
 app = Flask(__name__)

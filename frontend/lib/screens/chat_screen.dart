@@ -17,6 +17,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final _apiService = ApiService();
 
   String? _toUser;
+  List<String> _allUsers = [];  // ✅ new: store all users
   List<Map<String, dynamic>> _combinedUsers = [];
 
   @override
@@ -27,29 +28,30 @@ class _ChatScreenState extends State<ChatScreen> {
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     final password = authProvider.user!.password;
 
-    _wsService.onOnlineUsersUpdated = (onlineUsers) {
-      _combineUsers(onlineUsers);
+    // ✅ Use new callback for combined presence updates
+    _wsService.onPresenceUpdate = (online, all) {
+      _allUsers = all;
+      _combineUsers(online);
     };
 
     _wsService.connect(authProvider.user!.username, password, (Message msg) {
       chatProvider.addMessage(msg);
     });
 
-    _loadUsers();
+    // ✅ Optional fallback: one-time load in case WebSocket fails
+    _loadUsersOnce();
   }
 
-  void _loadUsers() async {
+  void _loadUsersOnce() async {
     final allUsers = await _apiService.getAllUsers();
     final onlineUsers = await _apiService.getOnlineUsers();
-    _combineUsers(onlineUsers, allUsers: allUsers);
+
+    _allUsers = allUsers;
+    _combineUsers(onlineUsers);
   }
 
-  void _combineUsers(List<String> online, {List<String>? allUsers}) async {
-    if (allUsers == null) {
-      allUsers = await _apiService.getAllUsers();
-    }
-
-    final combined = allUsers.map((u) {
+  void _combineUsers(List<String> online) {
+    final combined = _allUsers.map((u) {
       return {
         'username': u,
         'online': online.contains(u),
@@ -78,7 +80,7 @@ class _ChatScreenState extends State<ChatScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.refresh),
-            onPressed: _loadUsers,
+            onPressed: _loadUsersOnce,
             tooltip: 'Refresh Users',
           ),
         ],
